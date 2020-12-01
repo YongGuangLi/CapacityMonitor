@@ -5,6 +5,7 @@
 #include <QTextStream>
 #include <QDebug>
 #include <QMutexLocker>
+#include <QThreadPool>
 
 #include "capacitymonitor.h"
 #include "qtservice.h"
@@ -35,7 +36,6 @@ void customMessageHandler(QtMsgType type, const char *msg)
      //致命错误提示
      case QtFatalMsg:
              txt = QString("%1 Fatal: %2").arg(datatime).arg(msg);
-             abort();
      }
      QDateTime now = QDateTime::currentDateTime();
      QString filepath = qApp->applicationDirPath() + QString("/log%1.txt").arg(now.toString("yyyyMMdd"));
@@ -66,23 +66,13 @@ protected:
         SingletonDBHelper->open(SingletonConfig->getDbIp(), SingletonConfig->getDbPort(), \
                                 SingletonConfig->getDbName(), SingletonConfig->getDbUser(), SingletonConfig->getDbPasswd());
 
-
         CapacityMonitor *capacityMonitor = new CapacityMonitor();
-
     }
-
-    void pause()
-    {
-//    daemon->pause();
-    }
-
-    void resume()
-    {
-//    daemon->resume();
-    }
-
+	void stop()
+	{
+		qApp->exit(0);
+	}
 private:
-//    HttpDaemon *daemon;
 };
 
 
@@ -94,10 +84,12 @@ int main(int argc, char **argv)
     QSettings::setPath(QSettings::NativeFormat, QSettings::SystemScope, QDir::tempPath());
     qWarning("(Example uses dummy settings file: %s/QtSoftware.conf)", QDir::tempPath().toLatin1().constData());
 #endif
-//    QtCapacityMonitorService service(argc, argv);
 
+	QThreadPool::globalInstance()->setMaxThreadCount(MaxThreadCount); 
+//     QtCapacityMonitorService service(argc, argv);
+// 
+//     return service.exec();
 
-//    return service.exec();
     QCoreApplication a(argc, argv);
 
     SingletonConfig->initConfigFile(a.applicationDirPath() + "/sysconfig.ini");
@@ -105,10 +97,7 @@ int main(int argc, char **argv)
     SingletonDBHelper->open(SingletonConfig->getDbIp(), SingletonConfig->getDbPort(), \
                             SingletonConfig->getDbName(), SingletonConfig->getDbUser(), SingletonConfig->getDbPasswd());
 
-
-	//qInstallMsgHandler(customMessageHandler);
-
     CapacityMonitor *capacityMonitor = new CapacityMonitor();
 
-    return a.exec();
+   return a.exec();
 }

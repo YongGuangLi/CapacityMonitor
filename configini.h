@@ -32,6 +32,8 @@ public:
 
     QString getDeviceName() const;
 
+	QString getPythonServer() const;
+
 private:
     explicit ConfigIni(QObject *parent = 0);
     static ConfigIni* configIni; 
@@ -49,6 +51,8 @@ private:
     int m_step;
     QString m_serviceName;
     QString m_deviceName;
+
+	QString m_pythonServer;
 };
 
 #endif // CONFIGINI_H

@@ -13,6 +13,7 @@
 #include <QFileInfo>
 #include <QUuid>
 #include <QTimer>
+#include <QMutexLocker>
 #include <QMutex>
 
 typedef struct{
@@ -37,7 +38,9 @@ typedef struct{
 typedef struct{
 	QString fullIndexCode;
 	int IndexType;
-	int indexOrder; 
+	int indexOrder;  
+	int maxValue;
+	int minValue;
 }stSspgIndex;
 
   
@@ -82,7 +85,7 @@ public:
 
     void close();
 
-    bool queryCalcModel();
+    QMap<QString, stCalcModel> queryCalcModel();
 
     /**
     * @date      2020-09-04
@@ -91,30 +94,22 @@ public:
     * @brief     修改计算模型状态
     */
     bool updateCalcModelStatus(QString Id ,int status);
-
-    /**
-    * @date      2020-09-04
-    * @param
-    * @return
-    * @brief
-    */
-    bool updateLogisticDistribution();
-
-    QMap<QString, stCalcModel> getCalcModel();
-
+	 
     stPubIndex queryPubIndexCode(QString fullIndexCode);
 
     QList<stTfnlCondtion> queryTfnlCondtion(stCalcModel);
 
-    QList<stSspgIndex> queryTfnlSspgIndex(stCalcModel);
+    QList<stSspgIndex> queryTfnlSspgIndex(stCalcModel, int IndexType);
 
 	QList<stXnsyResult> queryXnsyResult(stCalcModel);
 
     bool insertFilterData(stCalcModel, QMap<int, QList<stPointInfo> > mapListPointInfo);
 
-    bool insertCNGKData(stCalcModel, QMap<int, double> mapFhAppearValue);
+    bool insertCNGKData(stCalcModel, QMap<int, double> mapFhAppearPercent);
 
 	bool insertEquation(stCalcModel, QString);
+
+	bool updatePubIndexValue(double value, QString fullIndexCode);
 public:
 
 signals:
@@ -137,7 +132,7 @@ signals:
 public slots:
 
 private:
-    QMap<QString, stCalcModel> mapCalcModel_;
+    
 };
 
 #endif // DATABASEHELPER_H

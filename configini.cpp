@@ -35,7 +35,8 @@ bool ConfigIni::initConfigFile(QString fileName)
         settings_->beginGroup("config");
         m_step =  settings_->value("step").toInt();
         m_serviceName =  settings_->value("ServiceName").toString();
-        m_deviceName =  settings_->value("DeviceName").toString();
+        m_deviceName =  settings_->value("DeviceName").toString(); 
+		m_pythonServer =  settings_->value("PythonServer").toString();
         settings_->endGroup();
     }
 
@@ -82,5 +83,10 @@ QString ConfigIni::getServiceName() const
 QString ConfigIni::getDeviceName() const
 {
     return m_deviceName;
+}
+
+QString ConfigIni::getPythonServer() const
+{
+	return m_pythonServer;
 }
 

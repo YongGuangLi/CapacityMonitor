@@ -34,6 +34,7 @@ using namespace ::apache::thrift::transport;
 #include "LeastSquaresCurve.h"
 #include "LeastSquareSurface.h"
 
+#define  MaxThreadCount 4
 class CapacityMonitor : public QObject
 {
     Q_OBJECT
@@ -42,19 +43,25 @@ public:
     
     void timerEvent(QTimerEvent *);
 
-    void startCalcModel(stCalcModel calcModel);
-	
+    void startCalcModel(stCalcModel calcModel); 
+
+
 	int GetHisValue(Tag* pTags,long startTime,long endTime, QString pubIndexCode,int iStep);
+	
+	int GetTagValues(const char* pTagsName,Tag *pTags, int *p_iCount);
 
-    QMap<int, double> calcFhAppearValue(QMap<int, QList<stPointInfo> > mapListPointInfo,QMap<QString, stTfnlCondtion> mapTfnlCondtion);
+    QMap<int, double> calcFhAppearPercent(QMap<int, QList<stPointInfo> > mapListPointInfo,QMap<QString, stTfnlCondtion> mapTfnlCondtion, std::vector<double>& list_CNGK_Data);
 
-    list<INPUT_POINT> calcInputPoint(QMap<int, QList<stPointInfo> > mapListPointInfo);
+    list<INPUT_POINT> getInputPoint(QMap<int, QList<stPointInfo> > mapListPointInfo);
 	 
-    list<INPUT_POINT3D> calcInputPoint3D(QMap<int, QList<stPointInfo> > mapListPointInfo);
+    list<INPUT_POINT3D> getInputPoint3D(QMap<int, QList<stPointInfo> > mapListPointInfo);
+
+private:
+	stPointInfo getPointInfo(stPubIndex pubIndex, Tag tag, int order = 0);
 signals:
-    
-public slots:
-    
+    void sendPredictModel(stCalcModel calcModel);
+public slots:  
+	void startPredictModel(stCalcModel calcModel);
 private:
     int queryModelTimerId_;
 	QMutex mutex_;

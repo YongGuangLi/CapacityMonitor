@@ -687,8 +687,8 @@ uint32_t CapacityMonitorService_trainModel_result::read(::apache::thrift::protoc
     switch (fid)
     {
       case 0:
-        if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString(this->success);
+        if (ftype == ::apache::thrift::protocol::T_I16) {
+          xfer += iprot->readI16(this->success);
           this->__isset.success = true;
         } else {
           xfer += iprot->skip(ftype);
@@ -721,8 +721,8 @@ uint32_t CapacityMonitorService_trainModel_result::write(::apache::thrift::proto
   xfer += oprot->writeStructBegin("CapacityMonitorService_trainModel_result");
 
   if (this->__isset.success) {
-    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRING, 0);
-    xfer += oprot->writeString(this->success);
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_I16, 0);
+    xfer += oprot->writeI16(this->success);
     xfer += oprot->writeFieldEnd();
   } else if (this->__isset.calcException) {
     xfer += oprot->writeFieldBegin("calcException", ::apache::thrift::protocol::T_STRUCT, 1);
@@ -761,8 +761,8 @@ uint32_t CapacityMonitorService_trainModel_presult::read(::apache::thrift::proto
     switch (fid)
     {
       case 0:
-        if (ftype == ::apache::thrift::protocol::T_STRING) {
-          xfer += iprot->readString((*(this->success)));
+        if (ftype == ::apache::thrift::protocol::T_I16) {
+          xfer += iprot->readI16((*(this->success)));
           this->__isset.success = true;
         } else {
           xfer += iprot->skip(ftype);
@@ -1246,10 +1246,10 @@ void CapacityMonitorServiceClient::recv_getWeibullDistributionModel(std::string&
   throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "getWeibullDistributionModel failed: unknown result");
 }
 
-void CapacityMonitorServiceClient::trainModel(std::string& _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data)
+int16_t CapacityMonitorServiceClient::trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data)
 {
   send_trainModel(modelid, list_data_info, list_data);
-  recv_trainModel(_return);
+  return recv_trainModel();
 }
 
 void CapacityMonitorServiceClient::send_trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data)
@@ -1268,7 +1268,7 @@ void CapacityMonitorServiceClient::send_trainModel(const std::string& modelid, c
   oprot_->getTransport()->flush();
 }
 
-void CapacityMonitorServiceClient::recv_trainModel(std::string& _return)
+int16_t CapacityMonitorServiceClient::recv_trainModel()
 {
 
   int32_t rseqid = 0;
@@ -1293,6 +1293,7 @@ void CapacityMonitorServiceClient::recv_trainModel(std::string& _return)
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
   }
+  int16_t _return;
   CapacityMonitorService_trainModel_presult result;
   result.success = &_return;
   result.read(iprot_);
@@ -1300,8 +1301,7 @@ void CapacityMonitorServiceClient::recv_trainModel(std::string& _return)
   iprot_->getTransport()->readEnd();
 
   if (result.__isset.success) {
-    // _return pointer has now been filled
-    return;
+    return _return;
   }
   if (result.__isset.calcException) {
     throw result.calcException;
@@ -1528,7 +1528,7 @@ void CapacityMonitorServiceProcessor::process_trainModel(int32_t seqid, ::apache
 
   CapacityMonitorService_trainModel_result result;
   try {
-    iface_->trainModel(result.success, args.modelid, args.list_data_info, args.list_data);
+    result.success = iface_->trainModel(args.modelid, args.list_data_info, args.list_data);
     result.__isset.success = true;
   } catch (CalcException &calcException) {
     result.calcException = calcException;
@@ -1802,10 +1802,10 @@ void CapacityMonitorServiceConcurrentClient::recv_getWeibullDistributionModel(st
   } // end while(true)
 }
 
-void CapacityMonitorServiceConcurrentClient::trainModel(std::string& _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data)
+int16_t CapacityMonitorServiceConcurrentClient::trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data)
 {
   int32_t seqid = send_trainModel(modelid, list_data_info, list_data);
-  recv_trainModel(_return, seqid);
+  return recv_trainModel(seqid);
 }
 
 int32_t CapacityMonitorServiceConcurrentClient::send_trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data)
@@ -1828,7 +1828,7 @@ int32_t CapacityMonitorServiceConcurrentClient::send_trainModel(const std::strin
   return cseqid;
 }
 
-void CapacityMonitorServiceConcurrentClient::recv_trainModel(std::string& _return, const int32_t seqid)
+int16_t CapacityMonitorServiceConcurrentClient::recv_trainModel(const int32_t seqid)
 {
 
   int32_t rseqid = 0;
@@ -1866,6 +1866,7 @@ void CapacityMonitorServiceConcurrentClient::recv_trainModel(std::string& _retur
         using ::apache::thrift::protocol::TProtocolException;
         throw TProtocolException(TProtocolException::INVALID_DATA);
       }
+      int16_t _return;
       CapacityMonitorService_trainModel_presult result;
       result.success = &_return;
       result.read(iprot_);
@@ -1873,9 +1874,8 @@ void CapacityMonitorServiceConcurrentClient::recv_trainModel(std::string& _retur
       iprot_->getTransport()->readEnd();
 
       if (result.__isset.success) {
-        // _return pointer has now been filled
         sentry.commit();
-        return;
+        return _return;
       }
       if (result.__isset.calcException) {
         sentry.commit();

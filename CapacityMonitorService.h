@@ -23,7 +23,7 @@ class CapacityMonitorServiceIf {
   virtual ~CapacityMonitorServiceIf() {}
   virtual void getLogisticDistributionModel(std::string& _return, const std::vector<double> & list_CNGK_Data) = 0;
   virtual void getWeibullDistributionModel(std::string& _return, const std::vector<double> & list_CNGK_Data) = 0;
-  virtual void trainModel(std::string& _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data) = 0;
+  virtual int16_t trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data) = 0;
   virtual void predict(std::vector<double> & _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data) = 0;
 };
 
@@ -60,8 +60,9 @@ class CapacityMonitorServiceNull : virtual public CapacityMonitorServiceIf {
   void getWeibullDistributionModel(std::string& /* _return */, const std::vector<double> & /* list_CNGK_Data */) {
     return;
   }
-  void trainModel(std::string& /* _return */, const std::string& /* modelid */, const std::vector<data_info> & /* list_data_info */, const std::vector<double> & /* list_data */) {
-    return;
+  int16_t trainModel(const std::string& /* modelid */, const std::vector<data_info> & /* list_data_info */, const std::vector<double> & /* list_data */) {
+    int16_t _return = 0;
+    return _return;
   }
   void predict(std::vector<double> & /* _return */, const std::string& /* modelid */, const std::vector<data_info> & /* list_data_info */, const std::vector<double> & /* list_data */) {
     return;
@@ -346,16 +347,16 @@ class CapacityMonitorService_trainModel_result {
 
   CapacityMonitorService_trainModel_result(const CapacityMonitorService_trainModel_result&);
   CapacityMonitorService_trainModel_result& operator=(const CapacityMonitorService_trainModel_result&);
-  CapacityMonitorService_trainModel_result() : success() {
+  CapacityMonitorService_trainModel_result() : success(0) {
   }
 
   virtual ~CapacityMonitorService_trainModel_result() throw();
-  std::string success;
+  int16_t success;
   CalcException calcException;
 
   _CapacityMonitorService_trainModel_result__isset __isset;
 
-  void __set_success(const std::string& val);
+  void __set_success(const int16_t val);
 
   void __set_calcException(const CalcException& val);
 
@@ -389,7 +390,7 @@ class CapacityMonitorService_trainModel_presult {
 
 
   virtual ~CapacityMonitorService_trainModel_presult() throw();
-  std::string* success;
+  int16_t* success;
   CalcException calcException;
 
   _CapacityMonitorService_trainModel_presult__isset __isset;
@@ -547,9 +548,9 @@ class CapacityMonitorServiceClient : virtual public CapacityMonitorServiceIf {
   void getWeibullDistributionModel(std::string& _return, const std::vector<double> & list_CNGK_Data);
   void send_getWeibullDistributionModel(const std::vector<double> & list_CNGK_Data);
   void recv_getWeibullDistributionModel(std::string& _return);
-  void trainModel(std::string& _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
+  int16_t trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
   void send_trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
-  void recv_trainModel(std::string& _return);
+  int16_t recv_trainModel();
   void predict(std::vector<double> & _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
   void send_predict(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
   void recv_predict(std::vector<double> & _return);
@@ -627,14 +628,13 @@ class CapacityMonitorServiceMultiface : virtual public CapacityMonitorServiceIf 
     return;
   }
 
-  void trainModel(std::string& _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data) {
+  int16_t trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data) {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->trainModel(_return, modelid, list_data_info, list_data);
+      ifaces_[i]->trainModel(modelid, list_data_info, list_data);
     }
-    ifaces_[i]->trainModel(_return, modelid, list_data_info, list_data);
-    return;
+    return ifaces_[i]->trainModel(modelid, list_data_info, list_data);
   }
 
   void predict(std::vector<double> & _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data) {
@@ -683,9 +683,9 @@ class CapacityMonitorServiceConcurrentClient : virtual public CapacityMonitorSer
   void getWeibullDistributionModel(std::string& _return, const std::vector<double> & list_CNGK_Data);
   int32_t send_getWeibullDistributionModel(const std::vector<double> & list_CNGK_Data);
   void recv_getWeibullDistributionModel(std::string& _return, const int32_t seqid);
-  void trainModel(std::string& _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
+  int16_t trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
   int32_t send_trainModel(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
-  void recv_trainModel(std::string& _return, const int32_t seqid);
+  int16_t recv_trainModel(const int32_t seqid);
   void predict(std::vector<double> & _return, const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
   int32_t send_predict(const std::string& modelid, const std::vector<data_info> & list_data_info, const std::vector<double> & list_data);
   void recv_predict(std::vector<double> & _return, const int32_t seqid);
