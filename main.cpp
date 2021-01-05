@@ -5,6 +5,7 @@
 #include <QTextStream>
 #include <QDebug>
 #include <QMutexLocker>
+#include <QDir>
 #include <QThreadPool>
 
 #include "capacitymonitor.h"
@@ -38,8 +39,13 @@ void customMessageHandler(QtMsgType type, const char *msg)
              txt = QString("%1 Fatal: %2").arg(datatime).arg(msg);
      }
      QDateTime now = QDateTime::currentDateTime();
-     QString filepath = qApp->applicationDirPath() + QString("/log%1.txt").arg(now.toString("yyyyMMdd"));
-     QFile outFile(filepath);
+     QString filepath = qApp->applicationDirPath() + QString("/logs/");
+	 QDir dir;
+	 if(!dir.exists(filepath))
+		dir.mkpath(filepath);
+
+	 QString fileName = QString("log%1.txt").arg(now.toString("yyyyMMdd"));
+     QFile outFile(filepath + fileName);
      outFile.open(QIODevice::WriteOnly | QIODevice::Append);
      QTextStream ts(&outFile);
      ts << txt << endl;
@@ -85,19 +91,16 @@ int main(int argc, char **argv)
     qWarning("(Example uses dummy settings file: %s/QtSoftware.conf)", QDir::tempPath().toLatin1().constData());
 #endif
 
-	QThreadPool::globalInstance()->setMaxThreadCount(MaxThreadCount); 
+ 	QThreadPool::globalInstance()->setMaxThreadCount(MaxThreadCount); 
+
 //     QtCapacityMonitorService service(argc, argv);
-// 
 //     return service.exec();
 
-    QCoreApplication a(argc, argv);
-
-    SingletonConfig->initConfigFile(a.applicationDirPath() + "/sysconfig.ini");
-
-    SingletonDBHelper->open(SingletonConfig->getDbIp(), SingletonConfig->getDbPort(), \
-                            SingletonConfig->getDbName(), SingletonConfig->getDbUser(), SingletonConfig->getDbPasswd());
-
-    CapacityMonitor *capacityMonitor = new CapacityMonitor();
-
-   return a.exec();
+	QCoreApplication a(argc, argv);
+	SingletonConfig->initConfigFile(a.applicationDirPath() + "/sysconfig.ini");
+	SingletonDBHelper->open(SingletonConfig->getDbIp(), SingletonConfig->getDbPort(),
+	SingletonConfig->getDbName(), SingletonConfig->getDbUser(), SingletonConfig->getDbPasswd());
+	CapacityMonitor *capacityMonitor = new CapacityMonitor();
+ 
+  return a.exec();
 }

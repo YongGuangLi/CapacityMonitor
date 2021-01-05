@@ -17,9 +17,7 @@ class ConfigIni : public QObject
 public:
     static ConfigIni *GetInstance();  
 	bool initConfigFile(QString);
-
-
-
+	  
     QString getDbIp() const;
     int getDbPort() const;
     QString getDbName() const;
@@ -34,6 +32,9 @@ public:
 
 	QString getPythonServer() const;
 
+	QString getFHIndex() const;
+	QString getDDSXIndex() const;
+	QString getDDXXIndex() const;
 private:
     explicit ConfigIni(QObject *parent = 0);
     static ConfigIni* configIni; 
@@ -53,6 +54,10 @@ private:
     QString m_deviceName;
 
 	QString m_pythonServer;
+
+	QString m_fhIndex;
+	QString m_ddsxIndex;
+	QString m_ddxxIndex;
 };
 
 #endif // CONFIGINI_H

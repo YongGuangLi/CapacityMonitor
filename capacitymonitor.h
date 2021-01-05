@@ -44,8 +44,7 @@ public:
     void timerEvent(QTimerEvent *);
 
     void startCalcModel(stCalcModel calcModel); 
-
-
+	 
 	int GetHisValue(Tag* pTags,long startTime,long endTime, QString pubIndexCode,int iStep);
 	
 	int GetTagValues(const char* pTagsName,Tag *pTags, int *p_iCount);
@@ -59,11 +58,17 @@ public:
 private:
 	stPointInfo getPointInfo(stPubIndex pubIndex, Tag tag, int order = 0);
 signals:
-    void sendPredictModel(stCalcModel calcModel);
+    void sendPredictModel(stCalcModel calcModel); 
+
+	void sendCalctAlarmModel(stCalcModel calcModel);
+
 public slots:  
-	void startPredictModel(stCalcModel calcModel);
+	void startPredictModel(stCalcModel calcModel); 
+
+	void startCalctAlarmModel(stCalcModel calcModel);
 private:
     int queryModelTimerId_;
+	 
 	QMutex mutex_;
 };
 

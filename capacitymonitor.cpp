@@ -3,7 +3,7 @@
 CapacityMonitor::CapacityMonitor(QObject *parent) :
     QObject(parent)
 {
-    queryModelTimerId_ = startTimer(10 * 1000);
+    queryModelTimerId_ = startTimer(10 * 1000); 
 
     QString szFile = qApp->applicationDirPath() + "/rtdb.ini";
     rtdb_InitialFromFile(szFile.toStdString().c_str());
@@ -31,10 +31,13 @@ void CapacityMonitor::timerEvent(QTimerEvent *timerEvent)
 				if(QThreadPool::globalInstance()->activeThreadCount() < MaxThreadCount)  
 					QtConcurrent::run(this, &CapacityMonitor::startCalcModel, calcModel); 
             }
-			//else  if((calcModel.ConditionType == 4 || calcModel.ConditionType == 5) && calcModel.XL_Status == 3)         //模型已提交，开始计算模型 
-			//	emit sendPredictModel(calcModel);  
+			else if((calcModel.ConditionType == 4 || calcModel.ConditionType == 5) && calcModel.XL_Status == 3 && calcModel.IS_Valid == 1)         //模型已提交，开始计算模型 
+			{	
+				emit sendPredictModel(calcModel);  
+				
+			}
         }
-    }
+    } 
 }
 
 
@@ -61,11 +64,12 @@ int CapacityMonitor::GetHisValue(Tag* pTags,long startTime,long endTime, QString
     {
         char error[100] = {0};
         rtdb_GetError(error);
-        qDebug()<<QString("Err:%1  PubIndexCode:%2  StartTime:%3  EndTime:%4").arg(QString::fromLocal8Bit(error)).arg(QString::fromStdString(strPubIndexCode))
+        qWarning()<<QString("Err:%1  PubIndexCode:%2  StartTime:%3  EndTime:%4").arg(QString::fromLocal8Bit(error)).arg(QString::fromStdString(strPubIndexCode))
 		        .arg(QDateTime::fromTime_t(startTime).toString("yyyy-MM-dd hh:mm:ss"))
 				.arg(QDateTime::fromTime_t(endTime).toString("yyyy-MM-dd hh:mm:ss"));
         iCount = 0;
     } 
+
     return iCount;
 }
 
@@ -90,16 +94,16 @@ int CapacityMonitor::GetTagValues(const char* pTagsName,Tag *pTags, int *p_iCoun
 void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 {
     qDebug()<<QString("Start Calculate Model:%1, BeginTime:%2, EndTime:%3").arg(calcModel.Id)
-			.arg(calcModel.BeginTime.toString("yyyy-MM-dd hh:mm:ss"))
-			.arg(calcModel.EndTime.toString("yyyy-MM-dd hh:mm:ss")); 
+			  .arg(calcModel.BeginTime.toString("yyyy-MM-dd hh:mm:ss"))
+			  .arg(calcModel.EndTime.toString("yyyy-MM-dd hh:mm:ss")); 
 	SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 2);
 
     uint startTime = calcModel.BeginTime.toTime_t();
     uint endTime = calcModel.EndTime.toTime_t();
-    int step = SingletonConfig->getStep();
-    int pTagsNum = (endTime - startTime) / step + 1;
-    Tag* pTags = (Tag *)malloc(sizeof(Tag) * pTagsNum);
-
+    int step = SingletonConfig->getStep(); 
+    int iTagNum = qCeil((endTime - startTime) / (float)step) + 1;  
+    Tag* pTags = (Tag *)malloc(sizeof(Tag) * iTagNum);
+	 
 	//过滤点,key:下标  value:点值
 	QMap<int, QList<stPointInfo> > mapListCondtionPointInfo;
 
@@ -107,7 +111,7 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 	QMap<QString, stTfnlCondtion> mapTfnlCondtion;
 
 	//从数据库获取过滤点名
-	QList<stTfnlCondtion> listTfnlCondtion = SingletonDBHelper->queryTfnlCondtion(calcModel);
+	QList<stTfnlCondtion> listTfnlCondtion = SingletonDBHelper->queryTfnlCondtion(calcModel); 
 	//从实时库获取过滤点值
 	for(int i = 0; i < listTfnlCondtion.size(); ++i)
 	{
@@ -119,12 +123,20 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 		//全点名为key，保存过滤条件
 		mapTfnlCondtion[pubIndex.WritebackCodeZ] = tfnlCondtion;
 
-		memset(pTags, 0, sizeof(Tag)*pTagsNum);
-		int iCount = GetHisValue(pTags, startTime, endTime, pubIndex.WritebackCodeZ, step);
-		qDebug()<<"Model:"<<calcModel.Id<<" condtionFullIndexCode:"<<fullIndexCode<<" Count:"<<iCount<<" UpLimit:"<<tfnlCondtion.UpLimit<<" LowLimit:"<<tfnlCondtion.LowLimit;
+		memset(pTags, 0, sizeof(Tag) * iTagNum);
+		int iCount = GetHisValue(pTags, startTime, endTime, pubIndex.WritebackCodeZ, step); 
+		qDebug()<<"Model:"<<calcModel.Id<<" condtionFullIndexCode:"<<fullIndexCode<<" pubIndexName:"<<pubIndex.WritebackCodeZ<<" Count:"<<iCount<<" UpLimit:"<<tfnlCondtion.UpLimit<<" LowLimit:"<<tfnlCondtion.LowLimit;
+		if(iCount == 0)  
+		{ 
+			qWarning()<<"Model:"<<calcModel.Id<<" Calculate Failure";
+			SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
+			break;
+		}
+
 		for(int j = 0; j < iCount; ++j)
 		{
-			stPointInfo pointInfo = getPointInfo(pubIndex, pTags[j]); 
+			stPointInfo pointInfo = getPointInfo(pubIndex, pTags[j]);
+			//qDebug()<<QDateTime::fromTime_t(pTags[j].lTimeStamp).toString("yyyy-dd-MM hh:mm:ss");
 			mapListCondtionPointInfo[pTags[j].lTimeStamp].push_back(pointInfo);
 		}  
 	}
@@ -149,20 +161,28 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 		datainfo.colName = pubIndex.IndexNameC.toUtf8().data();
 		list_data_info.push_back(datainfo);
 
-		memset(pTags, 0, sizeof(Tag)*pTagsNum);
+		memset(pTags, 0, sizeof(Tag) * iTagNum);
 		int iCount = GetHisValue(pTags, startTime, endTime, pubIndex.WritebackCodeZ, step);
-		qDebug()<<"Model:"<<calcModel.Id<<" SspgIndexFullIndexCode:"<<sspgIndex.fullIndexCode<<" pubIndexName:"<<pubIndex.WritebackCodeZ<<" Count:"<<iCount
-				<<" MaxValue:"<<sspgIndex.maxValue<<" MinValue:"<<sspgIndex.minValue;
+		qDebug()<<"Model:"<<calcModel.Id<<" SspgIndexFullIndexCode:"<<sspgIndex.fullIndexCode<<" pubIndexName:"<<pubIndex.WritebackCodeZ
+			   <<" Count:"<<iCount<<" MaxValue:"<<sspgIndex.maxValue<<" MinValue:"<<sspgIndex.minValue;
+		if(iCount == 0)  
+		{
+			qWarning()<<"Model:"<<calcModel.Id<<" Calculate Failure";
+			SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
+			break;
+		}
+
 		for(int j = 0; j < iCount; ++j)
 		{
 			stPointInfo pointInfo = getPointInfo(pubIndex,pTags[j], sspgIndex.indexOrder);
+			//qDebug()<<QDateTime::fromTime_t(pTags[j].lTimeStamp).toString("yyyy-dd-MM hh:mm:ss");
 			mapListSspgPointInfo[pTags[j].lTimeStamp].push_back(pointInfo);
 		}  
 	} 
 	 
 	//过滤前记录条数
 	qDebug()<<"Model:"<<calcModel.Id<<" FilterBeforeSspgPointInfoSize:"<<mapListSspgPointInfo.size();
-	//记录每个过滤条件过滤的条数
+	//记录每个过滤条件过滤的个数
 	QMap<QString, int> mapFilterCount; 
 	//按过滤条件过滤计算点
 	QMapIterator<int, QList<stPointInfo> > itSspgPointInfo(mapListSspgPointInfo);
@@ -185,7 +205,7 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 		if (!mapListCondtionPointInfo.contains(timeStamp)) 
 		{
 			mapListSspgPointInfo.remove(timeStamp);
-			mapFilterCount["not contains"]++;
+			mapFilterCount["timeStamp not contains"]++;
 			continue;   
 		}
 		  
@@ -212,19 +232,20 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 			} 
 		} 
 	}
+	//打印过滤条件过滤的点值个数
 	QMapIterator<QString, int> itFilterCount(mapFilterCount);
 	while(itFilterCount.hasNext())
 	{
 		itFilterCount.next();
-		qDebug()<<QString("Model:%1 filterParam:%2, filterCount:%3").arg(calcModel.Id).arg(itFilterCount.key()).arg(itFilterCount.value());
+		qDebug()<<QString("Model:%1 FilterParam:%2, FilterCount:%3").arg(calcModel.Id).arg(itFilterCount.key()).arg(itFilterCount.value());
 	}
 	//过滤后记录条数
 	qDebug()<<"Model:"<<calcModel.Id<<" FilterLaterSspgPointInfoSize:"<<mapListSspgPointInfo.size();
-    //1:调峰曲线上限、2:调峰曲线下限、3:纯凝曲线、4:实时评估上限、5:实时评估下限
+ 
     switch(calcModel.ConditionType)
     {  
-	case 1:
-	case 2:
+	case 1: //1:调峰曲线上限
+	case 2: //2:调峰曲线下限
 	{
 		SingletonDBHelper->insertFilterData(calcModel, mapListSspgPointInfo);
 
@@ -238,12 +259,15 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 			int result = curve.ReturnPoint(inputData, output, paramList);  
 			if(result == 0)
 			{
-				qDebug()<<"Model:"<<calcModel.Id<<" calc InputPoint Success, paramList:"<<paramList.c_str(); 
+				qDebug()<<"Model:"<<calcModel.Id<<" Calculate Success, paramList:"<<paramList.c_str(); 
 				if(SingletonDBHelper->insertEquation(calcModel, QString::fromStdString(paramList)))  
 					SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 3);
 			} 
 			else 
-				qWarning()<<"Model:"<<calcModel.Id<<" calc InputPoint Failure, Model:"<<calcModel.Id; 
+			{
+				qWarning()<<"Model:"<<calcModel.Id<<" Calculate Failure";
+				SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
+			}
 		}
 		else if(listSspgIndex.size() == 3)   //三维曲面
 		{
@@ -255,16 +279,19 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 			int result = surface.ReturnPoint(inputData3D, out_point, paramList); 
 			if(result == 0)
 			{
-				qDebug()<<"Model:"<<calcModel.Id<<" calc InputPoint3D Success, paramList:"<<paramList.c_str(); 
+				qDebug()<<"Model:"<<calcModel.Id<<" Calculate Success, paramList:"<<paramList.c_str(); 
 				if(SingletonDBHelper->insertEquation(calcModel, QString::fromStdString(paramList)))
 					SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 3);
 			} 
 			else 
-				qWarning()<<"Model:"<<calcModel.Id<<" calc InputPoint3D Failure, Model:"<<calcModel.Id; 
+			{
+				qWarning()<<"Model:"<<calcModel.Id<<" Calculate Failure";
+				SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
+			}
 		}	
 		break;
 	}
-	case 3:      //纯凝工况
+	case 3:  //3:纯凝曲线
 	{   
 		//符合过滤条件的点值
 		std::vector<double> list_CNGK_Data;
@@ -284,26 +311,26 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 			transport->open();
 			string weibullParamList;
 			client.getWeibullDistributionModel(weibullParamList,list_CNGK_Data);
-			qDebug()<<"Model:"<<calcModel.Id<<" weibullParamList:"<<weibullParamList.c_str();
+			qDebug()<<"Model:"<<calcModel.Id<<" WeibullParamList:"<<weibullParamList.c_str();
 
 			string logisticParamList;
 			client.getLogisticDistributionModel(logisticParamList,list_CNGK_Data);
-			qDebug()<<"Model:"<<calcModel.Id<<" logisticParamList:"<<logisticParamList.c_str();
+			qDebug()<<"Model:"<<calcModel.Id<<" LogisticParamList:"<<logisticParamList.c_str();
 
 			SingletonDBHelper->insertEquation(calcModel, QString::fromStdString(weibullParamList + ";" + logisticParamList));
 			SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 3);
 			transport->close();
 		}
 		catch (TException& tx)
-		{
-			qCritical()<<tx.what();
+		{ 
+			qWarning()<<"Model:"<<calcModel.Id<<" Calculate Failure,Err:"<<tx.what();
+			SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
 		} 
 		break;
 	}
-    case 4:
-    case 5:
-    {  
-		//4:实时评估上限、5:实时评估下限 	 
+	case 4:  //4:实时评估上限
+    case 5:  //5:实时评估下限 	
+    {   
 		if (mapListSspgPointInfo.size() == 0) 
 			break; 
 
@@ -337,13 +364,16 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 				SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 3); 
 			}
 			else  
-				qWarning()<<"Model:"<<calcModel.Id<<" trainModel Failure:"<<calcModel.Id; 
-
+			{ 
+				qWarning()<<"Model:"<<calcModel.Id<<" Calculate Failure";
+				SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
+			}
 			transport->close();
 		}
 		catch (TException& tx)
-		{
-			qCritical()<<tx.what();
+		{ 
+			qWarning()<<"Model:"<<calcModel.Id<<" Calculate Failure,Err:"<<tx.what();
+			SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
 		}  
 		break;
     } 
@@ -386,34 +416,35 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
     default:
         break;
     }
-
-    if (pTags != NULL)
-    {
-        free(pTags);
-        pTags = NULL;
-    }
+ 
+	if (pTags != NULL)
+	{
+		free(pTags);
+		pTags = NULL;
+	}
 	 
     qDebug()<<QString("Finish Calculate Model:%1").arg(calcModel.Id);
 }
 
 void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 {  
-	qDebug()<<QString("Start Predict Model:%1").arg(calcModel.Id); 
+	//qDebug()<<QString("Start Predict Model:%1").arg(calcModel.Id); 
 
-	//实时值
+	//保存实时值
 	std::vector<double> list_data;
 	std::vector<com::thriftcode::data_info>  list_data_info;
 
 	//从数据库获取计算点名
 	QList<stSspgIndex> listSspgIndex = SingletonDBHelper->queryTfnlSspgIndex(calcModel , 1);
-	//预测不用结果点值
-	int iTagNum = listSspgIndex.size() -1;  
+
+	//预测只需要结果点的上下限，不用实时点值
+	int iTagNum = listSspgIndex.size() - 1;  
 	  
-	Tag* pTags = (Tag *)malloc(sizeof(Tag)* iTagNum); 
-	memset(pTags,0,sizeof(Tag)*iTagNum);
+	Tag* pTags = (Tag *)malloc(sizeof(Tag) * iTagNum); 
+	memset(pTags, 0, sizeof(Tag) * iTagNum);
 	 
 	char *pTagsName = (char *)malloc(DEFAULT_TAGNAME_LEN * iTagNum); 
-	memset(pTagsName,0, iTagNum * DEFAULT_TAGNAME_LEN);    
+	memset(pTagsName, 0, iTagNum * DEFAULT_TAGNAME_LEN);    
 
 	//从实时库获取计算点值
 	for(int i = 0; i < listSspgIndex.size(); ++i)
@@ -427,7 +458,7 @@ void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 		datainfo.colName = pubIndex.IndexNameC.toUtf8().data();
 		list_data_info.push_back(datainfo);
 			
-		//预测不用结果点值
+		//预测只需要结果点的上下限，不用实时点值
 		if (i == (listSspgIndex.size() - 1))
 			continue;
 
@@ -439,7 +470,7 @@ void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 	int iCount = GetTagValues(pTagsName, pTags, &iTagNum);  
 	for(int j = 0; j < iCount; ++j) 
 		list_data.push_back( pTags[j].fValue);   
-
+	   
 	boost::shared_ptr<TTransport> socket(new TSocket(SingletonConfig->getPythonServer().toStdString(), 8000));
 	boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
 	boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
@@ -448,28 +479,27 @@ void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 	{
 		transport->open();   
 
-		std::vector<double> predictValue;
+		std::vector<double> vecPredictValue; 
+		client.predict(vecPredictValue, calcModel.Id.toStdString(), list_data_info, list_data);    
 
-		qDebug()<<"Send Predict Request:"<<calcModel.Id;
-		client.predict(predictValue, calcModel.Id.toStdString(), list_data_info, list_data);  
-		qDebug()<<"Receive Predict Return:"<<calcModel.Id<<" predictValueSize:"<<predictValue.size();
-
-		QList<stSspgIndex> listSspgIndexResult = SingletonDBHelper->queryTfnlSspgIndex(calcModel , 0);
-		for(int i = 0; i < listSspgIndexResult.size(); ++i)
+		QList<stSspgIndex> listSspgIndexResult = SingletonDBHelper->queryTfnlSspgIndex(calcModel , 0); 
+		for(int i = 0; i < vecPredictValue.size(); ++i)
 		{
+			double predictValue =  vecPredictValue.at(i);
 			stSspgIndex sspgIndex = listSspgIndexResult.value(i); 
-		  
-			if(SingletonDBHelper->updatePubIndexValue(predictValue.at(0), sspgIndex.fullIndexCode))
-				qDebug()<<"Model:"<<calcModel.Id<<" update PubIndexValue Success:"<<sspgIndex.fullIndexCode<<predictValue.at(0); 
+
+			if(SingletonDBHelper->updatePubIndexValue(predictValue, sspgIndex.fullIndexCode))
+				qDebug()<<"Model:"<<calcModel.Id<<" Update PubIndexValue Success:"<<sspgIndex.fullIndexCode<<predictValue; 
 			else 
-				qWarning()<<"Model:"<<calcModel.Id<<" update PubIndexValue Failure:"<<sspgIndex.fullIndexCode<<predictValue.at(0);  
+				qWarning()<<"Model:"<<calcModel.Id<<" Update PubIndexValue Failure:"<<sspgIndex.fullIndexCode<<predictValue;  
 		}
 
 		transport->close();
 	}
 	catch (TException& tx)
-	{ 
-		qCritical()<<tx.what();
+	{  
+		qWarning()<<"Model:"<<calcModel.Id<<" Predict Failure,Err:"<<tx.what();
+		SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
 	} 
 
 	if (pTags != NULL)
@@ -484,9 +514,30 @@ void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 		pTagsName = NULL;
 	}
 
-	qDebug()<<QString("Finish Predict Model:%1").arg(calcModel.Id);
+	//qDebug()<<QString("Finish Predict Model:%1").arg(calcModel.Id);
 }
 
+//当前负荷与调度上下限差的绝对值与调度上下限的比值小于等于5%时产生调峰告警
+void CapacityMonitor::startCalctAlarmModel(stCalcModel calcModel)
+{ 
+	QStringList listIndex;
+
+	listIndex.push_back(SingletonConfig->getFHIndex());
+	listIndex.push_back(SingletonConfig->getDDSXIndex());
+	listIndex.push_back(SingletonConfig->getDDXXIndex());
+
+	for (int i = 0; i < listIndex.size(); ++i)
+	{
+		QString fullIndexCode = QString("%1_M%2_FH").arg(calcModel.FactoryCode).arg(calcModel.SetCode).arg(listIndex.at(i));
+		stPubIndex pubIndex = SingletonDBHelper->queryPubIndexCode(fullIndexCode);
+		 
+		char pTagsName[DEFAULT_TAGNAME_LEN] = {0};  
+		strcpy(pTagsName, QString("%1.%2.%3").arg(SingletonConfig->getServiceName()).arg(SingletonConfig->getDeviceName()).arg(pubIndex.WritebackCodeZ).toStdString().c_str());
+		int iCount = 1;  
+		Tag tag; 
+		GetTagValues(pTagsName, &tag, &iCount);   
+	} 
+}
 QMap<int, double> CapacityMonitor::calcFhAppearPercent(QMap<int, QList<stPointInfo> > mapListPointInfo, QMap<QString, stTfnlCondtion> mapTfnlCondtion, std::vector<double>& list_CNGK_Data)
 {
     int sum = 0;
@@ -563,7 +614,7 @@ list<INPUT_POINT> CapacityMonitor::getInputPoint(QMap<int, QList<stPointInfo> > 
 			//qDebug()<<"desc:"<<pointInfo.desc<<" value:"<<pointInfo.value;
 			if (pointInfo.order == 0)   //负荷 
 				inputPoint.y = (double)pointInfo.value;  
-			else if(pointInfo.order == 1) //一级供热抽气流量 
+			else  //供热抽气流量,可能是1级也可能是2级
 				inputPoint.x = (double)pointInfo.value;  
 		} 
 

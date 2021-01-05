@@ -23,8 +23,8 @@ typedef struct{
     QDateTime BeginTime;
     QDateTime EndTime;
     int ConditionType;  //1:调峰曲线上限、2:调峰曲线下限、3:纯凝曲线、4:实时评估上限、5:实时评估下限
-    QString AlarmValue;
-    int XL_Status;   //模型状态(0：模型初始化配置中 1:模型提交，2:模型计算中 3:计算完成，4:计算失败)
+    int AlarmValue;     
+    int XL_Status;      //模型状态(0：模型初始化配置中 1:模型提交，2:模型计算中 3:计算完成，4:计算失败)
     int IS_Valid;
 }stCalcModel;
 
@@ -110,6 +110,8 @@ public:
 	bool insertEquation(stCalcModel, QString);
 
 	bool updatePubIndexValue(double value, QString fullIndexCode);
+
+	bool updtaeTFNLAlarm(stCalcModel,double , double, double, int);
 public:
 
 signals:

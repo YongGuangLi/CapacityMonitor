@@ -38,6 +38,15 @@ bool ConfigIni::initConfigFile(QString fileName)
         m_deviceName =  settings_->value("DeviceName").toString(); 
 		m_pythonServer =  settings_->value("PythonServer").toString();
         settings_->endGroup();
+
+		settings_->beginGroup("alarm");
+		m_fhIndex =  settings_->value("FH").toString();
+		m_ddsxIndex =  settings_->value("DDSX").toString();
+		m_ddxxIndex =  settings_->value("DDXX").toString();  
+		settings_->endGroup();
+
+
+		settings_->deleteLater();
     }
 
     return result;
@@ -90,3 +99,19 @@ QString ConfigIni::getPythonServer() const
 	return m_pythonServer;
 }
 
+
+QString ConfigIni::getFH() const
+{
+	return m_fh;
+}
+
+
+QString  ConfigIni::getDDSX() const
+{
+	return m_ddsx; 
+}
+
+QString  ConfigIni::getDDXX() const
+{ 
+	return m_ddxx; 
+}

@@ -7,7 +7,7 @@ DataBaseHelper * DataBaseHelper::dbHelp_ = NULL;
 
 #define SQL_UPDATE_MODEL   "update TB_TFNL_MODEL set XL_STATUS = %1 where ID = '%2'"
 
-#define SQL_SELECT_PUB_INDEDX "SELECT WRITE_BACK_CODE,INDEX_NAME from V_PUB_ALL_INDEX_AND_POINT where FULL_INDEX_CODE = '%1' AND (xtno = 1)"
+#define SQL_SELECT_PUB_INDEDX "SELECT WRITE_BACK_CODE,INDEX_NAME from V_PUB_ALL_INDEX_AND_POINT where FULL_INDEX_CODE = '%1' AND (xtno = 1 )" //or xtno = 4)"
 
 #define SQL_SELECT_TFNL_CONDTION "SELECT INDEX_CODE,UP_LIMT,UP_LIMT_IN,LOW_LIMT,LOW_LIMT_IN from TB_TFNL_CONDTION where MODEL_ID = '%1'"
 
@@ -28,6 +28,8 @@ DataBaseHelper * DataBaseHelper::dbHelp_ = NULL;
 #define SQL_SELECT_TFNL_XNSYRESULT "SELECT GRCQLL_VALUE,TFSX_VALUE,TFXX_VALUE from TB_TFNL_XNSYRESULT where MODEL_ID = '%1'"
 
 #define SQL_UPDATE_PUB_INDEX_VALUE  "update TB_PUB_INDEX_VALUE set UPDATE_TIME = to_date('%1', 'yyyy-mm-dd hh24:mi:ss'), CURRENT_VALUE = %2 where FULL_INDEX_CODE = '%3'"
+
+#define SQL_INSERT_TFNL_ALARM "INSERT INTO TB_TFNL_ALARM(FACTORY_CODE,SET_CODE,FH_VALUE,DDSX_VALUE,DDXX_VALUE,ALARM_TYPE,ALARM_BEGIN_TIME,ALARM_END_TIME) from TB_TFNL_XNSYRESULT where MODEL_ID = '%1'"
 
 DataBaseHelper::DataBaseHelper(QObject *parent) : QObject(parent)
 {
@@ -92,7 +94,7 @@ QMap<QString, stCalcModel>  DataBaseHelper::queryCalcModel()
         calcModel.BeginTime = query.value(3).toDateTime();
         calcModel.EndTime = query.value(4).toDateTime();
         calcModel.ConditionType = query.value(5).toInt();
-        calcModel.AlarmValue = query.value(6).toString();
+        calcModel.AlarmValue = query.value(6).toInt();
         calcModel.XL_Status = query.value(7).toInt();
         calcModel.IS_Valid = query.value(8).toInt();
 
@@ -163,6 +165,12 @@ QList<stTfnlCondtion> DataBaseHelper::queryTfnlCondtion(stCalcModel calcModel)
     return listTfnlCondtion;
 }
 
+/*
+	* @date      2020-09-30
+	* @param     
+	* @return    
+	* @brief     IndexType:0 预测结果点  IndexType:1 INDEX_ORDER最大为训练结果点
+*/
 QList<stSspgIndex> DataBaseHelper::queryTfnlSspgIndex(stCalcModel calcModel, int IndexType)
 {
 	QMutexLocker mutexLocker(&mutex_); 
@@ -302,6 +310,18 @@ bool DataBaseHelper::updatePubIndexValue(double value, QString fullIndexCode)
 	return result;
 }
 
+
+bool DataBaseHelper::updtaeTFNLAlarm(stCalcModel calcModel,double fhValue, double ddsxValue, double ddxxValue, int alarmType) 
+{
+	QMutexLocker mutexLocker(&mutex_); 
+	bool result = false;
+
+	QSqlQuery query;  
+
+	QString date = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+	return result; 
+
+}
 DataBaseHelper *DataBaseHelper::GetInstance()
 {
     if(dbHelp_ == NULL)
