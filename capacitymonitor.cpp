@@ -31,10 +31,9 @@ void CapacityMonitor::timerEvent(QTimerEvent *timerEvent)
 				if(QThreadPool::globalInstance()->activeThreadCount() < MaxThreadCount)  
 					QtConcurrent::run(this, &CapacityMonitor::startCalcModel, calcModel); 
             }
-			else if((calcModel.ConditionType == 4 || calcModel.ConditionType == 5) && calcModel.XL_Status == 3 && calcModel.IS_Valid == 1)         //模型已提交，开始计算模型 
+			else if((calcModel.ConditionType == 4 || calcModel.ConditionType == 5)  && calcModel.IS_Valid == 1) //模型已提交，开始计算模型  && calcModel.XL_Status == 3
 			{	
 				emit sendPredictModel(calcModel);  
-				
 			}
         }
     } 
@@ -91,6 +90,18 @@ int CapacityMonitor::GetTagValues(const char* pTagsName,Tag *pTags, int *p_iCoun
 	return *p_iCount; 
 }
 
+
+float CapacityMonitor::GetIndexCodeValue(QString indexCode)
+{ 
+	stPubIndex pubIndex = SingletonDBHelper->queryPubIndexCode(indexCode);
+
+	char pTagsName[DEFAULT_TAGNAME_LEN] = {0};  
+	strcpy(pTagsName, QString("%1.%2.%3").arg(SingletonConfig->getServiceName()).arg(SingletonConfig->getDeviceName()).arg(pubIndex.WritebackCodeZ).toStdString().c_str());
+	int iCount = 1;  
+	Tag tag; 
+	GetTagValues(pTagsName, &tag, &iCount); 
+	return tag.fValue;
+}
 void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 {
     qDebug()<<QString("Start Calculate Model:%1, BeginTime:%2, EndTime:%3").arg(calcModel.Id)
@@ -136,7 +147,7 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 		for(int j = 0; j < iCount; ++j)
 		{
 			stPointInfo pointInfo = getPointInfo(pubIndex, pTags[j]);
-			//qDebug()<<QDateTime::fromTime_t(pTags[j].lTimeStamp).toString("yyyy-dd-MM hh:mm:ss");
+			//qDebug()<<QDateTime::fromTime_t(pTags[j].lTimeStamp).toString("yyyy-dd-MM hh:mm:ss")<<pTags[j].fValue;
 			mapListCondtionPointInfo[pTags[j].lTimeStamp].push_back(pointInfo);
 		}  
 	}
@@ -299,6 +310,8 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 		//计算负荷出现次数的百分比
 		QMap<int, double> mapFhAppearPercent = calcFhAppearPercent(mapListCondtionPointInfo, mapTfnlCondtion, list_CNGK_Data);
 
+		qDebug()<<"Model:"<<calcModel.Id<<" list_CNGK_DataSize:"<<list_CNGK_Data.size();
+
 		//纯凝工况数据插入数据库
 		SingletonDBHelper->insertCNGKData(calcModel, mapFhAppearPercent);
 
@@ -427,9 +440,63 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 }
 
 void CapacityMonitor::startPredictModel(stCalcModel calcModel)
-{  
-	//qDebug()<<QString("Start Predict Model:%1").arg(calcModel.Id); 
+{    
+	QString fullIndexCode = QString("%1_M%2_%3").arg(calcModel.FactoryCode).arg(calcModel.SetCode).arg("FH");
+	float fhValue = GetIndexCodeValue(fullIndexCode);
+	 
+	if (calcModel.ConditionType == 4)
+	{
+		QString ddsxIndexCode = QString("%1_M%2_%3").arg(calcModel.FactoryCode).arg(calcModel.SetCode).arg(SingletonConfig->getDDSXIndexCode());
+		float ddsxValue = GetIndexCodeValue(ddsxIndexCode);
+		qDebug()<<fhValue<<ddsxValue;
+		if(qAbs(ddsxValue - fhValue) / ddsxValue * 100 < calcModel.AlarmValue)
+		{ 
+			if(!mapCalcModelAlarm.contains(calcModel.Id))
+			{ 
+				QString alarmID = QUuid::createUuid();
+				mapCalcModelAlarm[calcModel.Id] = alarmID;
 
+				SingletonDBHelper->insertTFNLAlarm(alarmID, calcModel, fhValue, ddsxValue, 0, 1);
+			}
+		} 
+		else
+		{
+			if(mapCalcModelAlarm.contains(calcModel.Id))
+			{
+				QString alarmID = mapCalcModelAlarm.value(calcModel.Id);
+
+				SingletonDBHelper->updateTFNLAlarm(alarmID);
+				mapCalcModelAlarm.remove(calcModel.Id);
+			}
+		}
+	}
+	else if(calcModel.ConditionType == 5)
+	{
+		QString ddxxIndexCode = QString("%1_M%2_%3").arg(calcModel.FactoryCode).arg(calcModel.SetCode).arg(SingletonConfig->getDDXXIndexCode());
+		float ddxxValue = GetIndexCodeValue(ddxxIndexCode); 
+		qDebug()<<fhValue<<ddxxValue;
+		if(qAbs(ddxxValue - fhValue) / ddxxValue * 100 < calcModel.AlarmValue)
+		{ 
+			if(!mapCalcModelAlarm.contains(calcModel.Id))
+			{ 
+				QString alarmID = QUuid::createUuid();
+				mapCalcModelAlarm[calcModel.Id] = alarmID;
+
+				SingletonDBHelper->insertTFNLAlarm(alarmID, calcModel, fhValue, 0, ddxxValue, 2);
+			}
+		} 
+		else
+		{
+			if(mapCalcModelAlarm.contains(calcModel.Id))
+			{
+				QString alarmID = mapCalcModelAlarm.value(calcModel.Id);
+
+				SingletonDBHelper->updateTFNLAlarm(alarmID);
+				mapCalcModelAlarm.remove(calcModel.Id);
+			}
+		} 
+	}
+	/*
 	//保存实时值
 	std::vector<double> list_data;
 	std::vector<com::thriftcode::data_info>  list_data_info;
@@ -512,32 +579,11 @@ void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 	{
 		free(pTagsName);
 		pTagsName = NULL;
-	}
-
-	//qDebug()<<QString("Finish Predict Model:%1").arg(calcModel.Id);
-}
-
-//当前负荷与调度上下限差的绝对值与调度上下限的比值小于等于5%时产生调峰告警
-void CapacityMonitor::startCalctAlarmModel(stCalcModel calcModel)
-{ 
-	QStringList listIndex;
-
-	listIndex.push_back(SingletonConfig->getFHIndex());
-	listIndex.push_back(SingletonConfig->getDDSXIndex());
-	listIndex.push_back(SingletonConfig->getDDXXIndex());
-
-	for (int i = 0; i < listIndex.size(); ++i)
-	{
-		QString fullIndexCode = QString("%1_M%2_FH").arg(calcModel.FactoryCode).arg(calcModel.SetCode).arg(listIndex.at(i));
-		stPubIndex pubIndex = SingletonDBHelper->queryPubIndexCode(fullIndexCode);
-		 
-		char pTagsName[DEFAULT_TAGNAME_LEN] = {0};  
-		strcpy(pTagsName, QString("%1.%2.%3").arg(SingletonConfig->getServiceName()).arg(SingletonConfig->getDeviceName()).arg(pubIndex.WritebackCodeZ).toStdString().c_str());
-		int iCount = 1;  
-		Tag tag; 
-		GetTagValues(pTagsName, &tag, &iCount);   
 	} 
+	*/
 }
+
+ 
 QMap<int, double> CapacityMonitor::calcFhAppearPercent(QMap<int, QList<stPointInfo> > mapListPointInfo, QMap<QString, stTfnlCondtion> mapTfnlCondtion, std::vector<double>& list_CNGK_Data)
 {
     int sum = 0;
@@ -556,22 +602,22 @@ QMap<int, double> CapacityMonitor::calcFhAppearPercent(QMap<int, QList<stPointIn
             stPointInfo pointInfo = listPointInfo.value(i);
 			//qDebug()<<"timeStamp:"<<QDateTime::fromTime_t(pointInfo.timeStamp).toString("yyyy-MM-dd hh:mm:ss")<<" desc:"<<pointInfo.desc<<" value:"<<pointInfo.value;
 
-           if(pointInfo.desc.contains(QString::fromLocal8Bit("Ⅰ级")))
-           {
-               GRCQLL1_VALUE = pointInfo.value;
-               GRCQLL1_Condtion = mapTfnlCondtion.value(pointInfo.name);
-           }
-           else if(pointInfo.desc.contains(QString::fromLocal8Bit("ⅠⅠ")))
-           {
-               GRCQLL2_VALUE = pointInfo.value;
-               GRCQLL2_Condtion = mapTfnlCondtion.value(pointInfo.name);
-           }
-           else if(pointInfo.desc.contains(QString::fromLocal8Bit("负荷")))
-           {
-               FH_VALUE = pointInfo.value;
-               FH_Condtion = mapTfnlCondtion.value(pointInfo.name);
-           }
-        }
+			if(pointInfo.desc.contains(QString::fromLocal8Bit("Ⅰ级")) || pointInfo.desc.contains(QString::fromLocal8Bit("一级")))
+			{
+				GRCQLL1_VALUE = pointInfo.value;
+				GRCQLL1_Condtion = mapTfnlCondtion.value(pointInfo.name);
+			}
+			else if(pointInfo.desc.contains(QString::fromLocal8Bit("ⅠⅠ")) || pointInfo.desc.contains(QString::fromLocal8Bit("二级")))
+			{
+				GRCQLL2_VALUE = pointInfo.value;
+				GRCQLL2_Condtion = mapTfnlCondtion.value(pointInfo.name);
+			}
+			else if(pointInfo.desc.contains(QString::fromLocal8Bit("负荷")))
+			{
+				FH_VALUE = pointInfo.value;
+				FH_Condtion = mapTfnlCondtion.value(pointInfo.name);
+			}
+		}
 		
 		if(((FH_VALUE >= FH_Condtion.LowLimit) && (FH_VALUE <= FH_Condtion.UpLimit)) && (GRCQLL1_VALUE <= 3) && (GRCQLL2_VALUE <= 3))    
         {

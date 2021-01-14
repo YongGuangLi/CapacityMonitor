@@ -15,6 +15,7 @@
 #include <QTimer>
 #include <QMutexLocker>
 #include <QMutex>
+#include <QMap>
 
 typedef struct{
     QString Id;
@@ -111,7 +112,10 @@ public:
 
 	bool updatePubIndexValue(double value, QString fullIndexCode);
 
-	bool updtaeTFNLAlarm(stCalcModel,double , double, double, int);
+
+	bool insertTFNLAlarm(QString Id, stCalcModel,double , double, double, int);
+
+	bool updateTFNLAlarm(QString Id);
 public:
 
 signals:
@@ -126,15 +130,8 @@ private:
     QString dbName_;
     QString user_;
     QString passwd_;
-
-
-    QMutex mutex_;
-signals:
-
-public slots:
-
-private:
-    
+	 
+    QMutex mutex_;  
 };
 
 #endif // DATABASEHELPER_H

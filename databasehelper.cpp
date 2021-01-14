@@ -29,7 +29,10 @@ DataBaseHelper * DataBaseHelper::dbHelp_ = NULL;
 
 #define SQL_UPDATE_PUB_INDEX_VALUE  "update TB_PUB_INDEX_VALUE set UPDATE_TIME = to_date('%1', 'yyyy-mm-dd hh24:mi:ss'), CURRENT_VALUE = %2 where FULL_INDEX_CODE = '%3'"
 
-#define SQL_INSERT_TFNL_ALARM "INSERT INTO TB_TFNL_ALARM(FACTORY_CODE,SET_CODE,FH_VALUE,DDSX_VALUE,DDXX_VALUE,ALARM_TYPE,ALARM_BEGIN_TIME,ALARM_END_TIME) from TB_TFNL_XNSYRESULT where MODEL_ID = '%1'"
+#define SQL_INSERT_TFNL_ALARM "INSERT INTO TB_TFNL_ALARM(ID,FACTORY_CODE,SET_CODE,FH_VALUE,DDSX_VALUE,DDXX_VALUE,ALARM_TYPE,ALARM_BEGIN_TIME,IS_CONFIRM)VALUES ('%1','%2','%3','%4','%5','%6', %7,to_date('%8', 'yyyy-mm-dd hh24:mi:ss'), %9)"
+
+#define SQL_UPDATE_TFNL_ALARM "update TB_TFNL_ALARM set ALARM_END_TIME = to_date('%1', 'yyyy-mm-dd hh24:mi:ss') where ID = '%2'"
+
 
 DataBaseHelper::DataBaseHelper(QObject *parent) : QObject(parent)
 {
@@ -311,17 +314,42 @@ bool DataBaseHelper::updatePubIndexValue(double value, QString fullIndexCode)
 }
 
 
-bool DataBaseHelper::updtaeTFNLAlarm(stCalcModel calcModel,double fhValue, double ddsxValue, double ddxxValue, int alarmType) 
+bool DataBaseHelper::insertTFNLAlarm(QString Id,stCalcModel calcModel,double fhValue, double ddsxValue, double ddxxValue, int alarmType) 
+{
+	QMutexLocker mutexLocker(&mutex_); 
+	bool result = false; 
+
+	QString date = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+
+	QSqlQuery query(QString(SQL_INSERT_TFNL_ALARM).arg(Id).arg(calcModel.FactoryCode).arg(calcModel.SetCode).arg(fhValue)
+					.arg(ddsxValue).arg(ddxxValue).arg(alarmType).arg(date).arg(0));  
+	if(query.lastError().isValid())
+	{
+		qWarning()<<query.lastError().text()<<query.lastQuery();
+		result = false;
+	}
+	return result; 
+
+}
+bool DataBaseHelper::updateTFNLAlarm(QString Id) 
 {
 	QMutexLocker mutexLocker(&mutex_); 
 	bool result = false;
 
-	QSqlQuery query;  
-
 	QString date = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
-	return result; 
 
+	QSqlQuery query(QString(SQL_UPDATE_TFNL_ALARM).arg(date).arg(Id));  
+	if(query.lastError().isValid())
+	{
+		qWarning()<<query.lastError().text()<<query.lastQuery();
+		result = false;
+	}
+
+	return result;  
 }
+
+
+bool updtaeTFNLAlarm(QString Id);
 DataBaseHelper *DataBaseHelper::GetInstance()
 {
     if(dbHelp_ == NULL)

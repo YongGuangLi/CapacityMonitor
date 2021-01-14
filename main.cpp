@@ -93,14 +93,13 @@ int main(int argc, char **argv)
 
  	QThreadPool::globalInstance()->setMaxThreadCount(MaxThreadCount); 
 
-//     QtCapacityMonitorService service(argc, argv);
-//     return service.exec();
+    QtCapacityMonitorService service(argc, argv);
+    return service.exec();
 
-	QCoreApplication a(argc, argv);
-	SingletonConfig->initConfigFile(a.applicationDirPath() + "/sysconfig.ini");
-	SingletonDBHelper->open(SingletonConfig->getDbIp(), SingletonConfig->getDbPort(),
-	SingletonConfig->getDbName(), SingletonConfig->getDbUser(), SingletonConfig->getDbPasswd());
-	CapacityMonitor *capacityMonitor = new CapacityMonitor();
- 
-  return a.exec();
+// 	QCoreApplication a(argc, argv);
+// 	SingletonConfig->initConfigFile(a.applicationDirPath() + "/sysconfig.ini");
+// 	SingletonDBHelper->open(SingletonConfig->getDbIp(), SingletonConfig->getDbPort(),
+// 	SingletonConfig->getDbName(), SingletonConfig->getDbUser(), SingletonConfig->getDbPasswd());
+// 	CapacityMonitor *capacityMonitor = new CapacityMonitor();
+// 	return a.exec();
 }

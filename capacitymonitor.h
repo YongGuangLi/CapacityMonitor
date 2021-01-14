@@ -49,6 +49,8 @@ public:
 	
 	int GetTagValues(const char* pTagsName,Tag *pTags, int *p_iCount);
 
+	float GetIndexCodeValue(QString indexCode);
+
     QMap<int, double> calcFhAppearPercent(QMap<int, QList<stPointInfo> > mapListPointInfo,QMap<QString, stTfnlCondtion> mapTfnlCondtion, std::vector<double>& list_CNGK_Data);
 
     list<INPUT_POINT> getInputPoint(QMap<int, QList<stPointInfo> > mapListPointInfo);
@@ -58,18 +60,16 @@ public:
 private:
 	stPointInfo getPointInfo(stPubIndex pubIndex, Tag tag, int order = 0);
 signals:
-    void sendPredictModel(stCalcModel calcModel); 
-
-	void sendCalctAlarmModel(stCalcModel calcModel);
+    void sendPredictModel(stCalcModel calcModel);  
 
 public slots:  
-	void startPredictModel(stCalcModel calcModel); 
-
-	void startCalctAlarmModel(stCalcModel calcModel);
+	void startPredictModel(stCalcModel calcModel);  
 private:
     int queryModelTimerId_;
 	 
 	QMutex mutex_;
+	 
+	QMap<QString, QString> mapCalcModelAlarm;
 };
 
 #endif // CAPACITYMONITOR_H

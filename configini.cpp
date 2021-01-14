@@ -40,9 +40,9 @@ bool ConfigIni::initConfigFile(QString fileName)
         settings_->endGroup();
 
 		settings_->beginGroup("alarm");
-		m_fhIndex =  settings_->value("FH").toString();
-		m_ddsxIndex =  settings_->value("DDSX").toString();
-		m_ddxxIndex =  settings_->value("DDXX").toString();  
+		m_fhIndexCode =  settings_->value("FH").toString();
+		m_ddsxIndexCode =  settings_->value("DDSX").toString();
+		m_ddxxIndexCode =  settings_->value("DDXX").toString();  
 		settings_->endGroup();
 
 
@@ -100,18 +100,18 @@ QString ConfigIni::getPythonServer() const
 }
 
 
-QString ConfigIni::getFH() const
+QString ConfigIni::getFHIndexCode() const
 {
-	return m_fh;
+	return m_fhIndexCode;
 }
 
 
-QString  ConfigIni::getDDSX() const
+QString  ConfigIni::getDDSXIndexCode() const
 {
-	return m_ddsx; 
+	return m_ddsxIndexCode; 
 }
 
-QString  ConfigIni::getDDXX() const
+QString  ConfigIni::getDDXXIndexCode() const
 { 
-	return m_ddxx; 
+	return m_ddxxIndexCode; 
 }

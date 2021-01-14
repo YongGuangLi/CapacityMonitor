@@ -32,9 +32,9 @@ public:
 
 	QString getPythonServer() const;
 
-	QString getFHIndex() const;
-	QString getDDSXIndex() const;
-	QString getDDXXIndex() const;
+	QString getFHIndexCode() const;
+	QString getDDSXIndexCode() const;
+	QString getDDXXIndexCode() const;
 private:
     explicit ConfigIni(QObject *parent = 0);
     static ConfigIni* configIni; 
@@ -55,9 +55,9 @@ private:
 
 	QString m_pythonServer;
 
-	QString m_fhIndex;
-	QString m_ddsxIndex;
-	QString m_ddxxIndex;
+	QString m_fhIndexCode;
+	QString m_ddsxIndexCode;
+	QString m_ddxxIndexCode;
 };
 
 #endif // CONFIGINI_H
