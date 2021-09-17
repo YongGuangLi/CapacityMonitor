@@ -7,13 +7,13 @@ DataBaseHelper * DataBaseHelper::dbHelp_ = NULL;
 
 #define SQL_UPDATE_MODEL   "update TB_TFNL_MODEL set XL_STATUS = %1 where ID = '%2'"
 
-#define SQL_SELECT_PUB_INDEDX "SELECT WRITE_BACK_CODE,INDEX_NAME from V_PUB_ALL_INDEX_AND_POINT where FULL_INDEX_CODE = '%1' AND (xtno = 1 )" //or xtno = 4)"
+#define SQL_SELECT_PUB_INDEDX "SELECT WRITE_BACK_CODE,INDEX_NAME from V_PUB_ALL_INDEX_AND_POINT where FULL_INDEX_CODE = '%1' AND (xtno = 1 or xtno = 4)"
 
 #define SQL_SELECT_TFNL_CONDTION "SELECT INDEX_CODE,UP_LIMT,UP_LIMT_IN,LOW_LIMT,LOW_LIMT_IN from TB_TFNL_CONDTION where MODEL_ID = '%1'"
 
 #define SQL_SELECT_TFNL_SSPGINDEX "SELECT FULL_INDEX_CODE,INDEX_TYPE,INDEX_ORDER,MAX_VALUE,MIN_VALUE from TB_TFNL_SSPGINDEX where MODEL_ID = '%1' and INDEX_TYPE = %2 order by INDEX_ORDER"
 
-#define SQL_INSERT_TFNL_FILTERDATA "INSERT INTO TB_TFNL_FILTERDATA (ID, MODEL_ID,GRCQLL1_VALUE,GRCQLL2_VALUE,FH_VALUE) VALUES ('%1','%2','%3','%4','%5')"
+#define SQL_INSERT_TFNL_FILTERDATA "INSERT INTO TB_TFNL_FILTERDATA (ID, MODEL_ID,GRCQLL1_VALUE,GRCQLL2_VALUE,GRCQLL3_VALUE,FH_VALUE) VALUES ('%1','%2','%3','%4','%5','%6')"
 
 #define SQL_DELETE_TFNL_FILTERDATA "DELETE FROM TB_TFNL_FILTERDATA WHERE MODEL_ID = '%1'"
 
@@ -81,11 +81,17 @@ void DataBaseHelper::close()
 QMap<QString, stCalcModel>  DataBaseHelper::queryCalcModel()
 {
 	QMutexLocker mutexLocker(&mutex_); 
+
+	isOpen();
+
 	QMap<QString, stCalcModel> mapCalcModel;
 
     QSqlQuery query(SQL_SELECT_MODEL);
     if(query.lastError().isValid()) 
-        qWarning()<<query.lastError().text(); 
+	{
+        qWarning()<<query.lastError().text();  
+		qWarning()<<query.lastQuery();
+	}
 		 
 
     while(query.next())
@@ -115,7 +121,8 @@ bool DataBaseHelper::updateCalcModelStatus(QString Id, int status)
     QSqlQuery query(QString(SQL_UPDATE_MODEL).arg(status).arg(Id));
     if(query.lastError().isValid())
     {
-        qWarning()<<query.lastError().text();
+		qWarning()<<query.lastError().text();
+		qWarning()<<query.lastQuery();
         result = false;
     }
 
@@ -130,12 +137,13 @@ stPubIndex DataBaseHelper::queryPubIndexCode(QString fullIndexCode)
     QSqlQuery query(QString(SQL_SELECT_PUB_INDEDX).arg(fullIndexCode));
     if(query.lastError().isValid())
     {
-        qWarning()<<query.lastError().text();
+		qWarning()<<query.lastError().text();
+		qWarning()<<query.lastQuery();
     } 
 
     while(query.next())
     {
-        pubIndex.WritebackCodeZ = query.value(0).toString();//.remove("_Z", Qt::CaseSensitive); 
+        pubIndex.WritebackCodeZ = query.value(0).toString().remove("_Z", Qt::CaseSensitive); 
 		pubIndex.IndexNameC = query.value(1).toString(); 
     }
 
@@ -150,7 +158,8 @@ QList<stTfnlCondtion> DataBaseHelper::queryTfnlCondtion(stCalcModel calcModel)
     QSqlQuery query(QString(SQL_SELECT_TFNL_CONDTION).arg(calcModel.Id));
     if(query.lastError().isValid())
     {
-        qWarning()<<query.lastError().text();
+		qWarning()<<query.lastError().text();
+		qWarning()<<query.lastQuery();
     }
 	 
     while(query.next())
@@ -182,7 +191,8 @@ QList<stSspgIndex> DataBaseHelper::queryTfnlSspgIndex(stCalcModel calcModel, int
     QSqlQuery query(QString(SQL_SELECT_TFNL_SSPGINDEX).arg(calcModel.Id).arg(IndexType));
     if(query.lastError().isValid())
     {
-        qWarning()<<query.lastError().text();
+		qWarning()<<query.lastError().text();
+		qWarning()<<query.lastQuery();
     }  
     while(query.next())
     {
@@ -208,6 +218,7 @@ QList<stXnsyResult> DataBaseHelper::queryXnsyResult(stCalcModel calcModel)
 	if(query.lastError().isValid())
 	{
 		qWarning()<<query.lastError().text();
+		qWarning()<<query.lastQuery();
 	} 
 
 	while(query.next())
@@ -237,7 +248,7 @@ bool DataBaseHelper::insertFilterData(stCalcModel calcModel, QMap<int, QList<stP
         while(it.hasNext())
         {
             it.next();
-            QString GRCQLL1_VALUE,GRCQLL2_VALUE,FH_VALUE;
+            QString GRCQLL1_VALUE,GRCQLL2_VALUE,GRCQLL3_VALUE,FH_VALUE;
             QList<stPointInfo> listPointInfo = it.value();
             for(int i = 0; i < listPointInfo.size(); ++i)
             {
@@ -248,9 +259,11 @@ bool DataBaseHelper::insertFilterData(stCalcModel calcModel, QMap<int, QList<stP
 					GRCQLL1_VALUE = QString::number(pointInfo.value); 
                 else if(pointInfo.order == 2) 
 					GRCQLL2_VALUE = QString::number(pointInfo.value); 
+				else if(pointInfo.order == 3) 
+					GRCQLL3_VALUE = QString::number(pointInfo.value); 
             } 
             QSqlQuery query;
-            query.exec(QString(SQL_INSERT_TFNL_FILTERDATA).arg(QUuid::createUuid()).arg(calcModel.Id).arg(GRCQLL1_VALUE).arg(GRCQLL2_VALUE).arg(FH_VALUE));
+            query.exec(QString(SQL_INSERT_TFNL_FILTERDATA).arg(QUuid::createUuid()).arg(calcModel.Id).arg(GRCQLL1_VALUE).arg(GRCQLL2_VALUE).arg(GRCQLL3_VALUE).arg(FH_VALUE));
         }
         result = QSqlDatabase::database().commit();
         if(!result)
@@ -307,6 +320,7 @@ bool DataBaseHelper::updatePubIndexValue(double value, QString fullIndexCode)
 	if(query.lastError().isValid())
 	{
 		qWarning()<<query.lastError().text();
+		qWarning()<<query.lastQuery();
 		result = false;
 	}
 
@@ -325,7 +339,8 @@ bool DataBaseHelper::insertTFNLAlarm(QString Id,stCalcModel calcModel,double fhV
 					.arg(ddsxValue).arg(ddxxValue).arg(alarmType).arg(date).arg(0));  
 	if(query.lastError().isValid())
 	{
-		qWarning()<<query.lastError().text()<<query.lastQuery();
+		qWarning()<<query.lastError().text();
+		qWarning()<<query.lastQuery();
 		result = false;
 	}
 	return result; 
@@ -341,7 +356,8 @@ bool DataBaseHelper::updateTFNLAlarm(QString Id)
 	QSqlQuery query(QString(SQL_UPDATE_TFNL_ALARM).arg(date).arg(Id));  
 	if(query.lastError().isValid())
 	{
-		qWarning()<<query.lastError().text()<<query.lastQuery();
+		qWarning()<<query.lastError().text();
+		qWarning()<<query.lastQuery();
 		result = false;
 	}
 

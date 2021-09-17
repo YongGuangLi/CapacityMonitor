@@ -1,4 +1,4 @@
-#include <QCoreApplication>
+﻿#include <QCoreApplication>
 #include <QStringList>
 #include <QDateTime>
 #include <QFile>
@@ -23,20 +23,20 @@ void customMessageHandler(QtMsgType type, const char *msg)
     switch (type) {
     //调试信息提示
      case QtDebugMsg:
-             txt = QString("%1 Debug: %2").arg(datatime).arg(msg);
+             txt = QString("%1 Debug: %2\n").arg(datatime).arg(msg);
              break;
 
      //一般的warning提示
      case QtWarningMsg:
-             txt = QString("%1 Warning: %2").arg(datatime).arg(msg);
+             txt = QString("%1 Warning: %2\n").arg(datatime).arg(msg);
      break;
      //严重错误提示
      case QtCriticalMsg:
-             txt = QString("%1 Critical: %2").arg(datatime).arg(msg);
+             txt = QString("%1 Critical: %2\n").arg(datatime).arg(msg);
      break;
      //致命错误提示
      case QtFatalMsg:
-             txt = QString("%1 Fatal: %2").arg(datatime).arg(msg);
+             txt = QString("%1 Fatal: %2\n").arg(datatime).arg(msg);
      }
      QDateTime now = QDateTime::currentDateTime();
      QString filepath = qApp->applicationDirPath() + QString("/logs/");
@@ -46,9 +46,9 @@ void customMessageHandler(QtMsgType type, const char *msg)
 
 	 QString fileName = QString("log%1.txt").arg(now.toString("yyyyMMdd"));
      QFile outFile(filepath + fileName);
-     outFile.open(QIODevice::WriteOnly | QIODevice::Append);
-     QTextStream ts(&outFile);
-     ts << txt << endl;
+	 outFile.open(QIODevice::WriteOnly | QIODevice::Append);
+	 outFile.write(txt.toLatin1().constData()); 
+	 outFile.close();
 }
 
 class QtCapacityMonitorService : public QtService<QCoreApplication>
@@ -65,7 +65,6 @@ protected:
     void start()
     {
         QCoreApplication *app = application();
-        qInstallMsgHandler(customMessageHandler);
 
         SingletonConfig->initConfigFile(app->applicationDirPath() + "/sysconfig.ini");
 
@@ -91,11 +90,12 @@ int main(int argc, char **argv)
     qWarning("(Example uses dummy settings file: %s/QtSoftware.conf)", QDir::tempPath().toLatin1().constData());
 #endif
 
- 	QThreadPool::globalInstance()->setMaxThreadCount(MaxThreadCount); 
+ 	QThreadPool::globalInstance()->setMaxThreadCount(MaxThreadCount);  
+	qInstallMsgHandler(customMessageHandler);
 
     QtCapacityMonitorService service(argc, argv);
     return service.exec();
-
+	 
 // 	QCoreApplication a(argc, argv);
 // 	SingletonConfig->initConfigFile(a.applicationDirPath() + "/sysconfig.ini");
 // 	SingletonDBHelper->open(SingletonConfig->getDbIp(), SingletonConfig->getDbPort(),

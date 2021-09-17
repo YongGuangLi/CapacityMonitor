@@ -45,3 +45,4 @@ temp/
 Win32/
 x64/
 release/
+Win32Debug/

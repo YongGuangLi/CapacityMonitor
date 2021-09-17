@@ -1,4 +1,4 @@
-#ifndef DATABASEHELPER_H
+﻿#ifndef DATABASEHELPER_H
 #define DATABASEHELPER_H
 
 #include "configini.h"

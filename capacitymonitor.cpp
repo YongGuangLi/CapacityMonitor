@@ -102,6 +102,7 @@ float CapacityMonitor::GetIndexCodeValue(QString indexCode)
 	GetTagValues(pTagsName, &tag, &iCount); 
 	return tag.fValue;
 }
+
 void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 {
     qDebug()<<QString("Start Calculate Model:%1, BeginTime:%2, EndTime:%3").arg(calcModel.Id)
@@ -227,15 +228,26 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 
 			//通过全点名，找到过滤条件
 			stTfnlCondtion tfnlCondtion = mapTfnlCondtion.value(pointInfo.name); 
-			
-			if(pointInfo.value <= tfnlCondtion.LowLimit) 
+			if(tfnlCondtion.LowLimitIn == 0  &&(pointInfo.value < tfnlCondtion.LowLimit)) 
 			{
 				//qDebug()<<"remove pointInfo name:"<<pointInfo.desc<<" value:"<<pointInfo.value<<" UpLimit:"<<tfnlCondtion.UpLimit<<" LowLimit:"<<tfnlCondtion.LowLimit;
 				mapFilterCount[pointInfo.name + " less"]++;
 				mapListSspgPointInfo.remove(timeStamp);  
 				break;
 			} 
-			else if(pointInfo.value >= tfnlCondtion.UpLimit) 
+			else if(tfnlCondtion.LowLimitIn == 1  &&(pointInfo.value <= tfnlCondtion.LowLimit)) 
+			{
+				mapFilterCount[pointInfo.name + " less"]++;
+				mapListSspgPointInfo.remove(timeStamp);  
+				break;
+			} 
+			else if(tfnlCondtion.UpLimitIn == 0 && (pointInfo.value > tfnlCondtion.UpLimit)) 
+			{
+				mapFilterCount[pointInfo.name + " greater"]++;
+				mapListSspgPointInfo.remove(timeStamp);  
+				break;
+			} 
+			else if(tfnlCondtion.UpLimitIn == 1 && (pointInfo.value >= tfnlCondtion.UpLimit)) 
 			{
 				mapFilterCount[pointInfo.name + " greater"]++;
 				mapListSspgPointInfo.remove(timeStamp);  
@@ -257,12 +269,10 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
     {  
 	case 1: //1:调峰曲线上限
 	case 2: //2:调峰曲线下限
-	{
-		SingletonDBHelper->insertFilterData(calcModel, mapListSspgPointInfo);
-
-		if(listSspgIndex.size() == 2)   //二维曲线
+	{ 
+		if(listSspgIndex.size() == 2)   //1级抽气
 		{
-			std::list<INPUT_POINT> inputData = getInputPoint(mapListSspgPointInfo); 
+			std::list<INPUT_POINT> inputData = getInputPoint(mapListSspgPointInfo, 1); 
 			std::list<INPUT_POINT> output;
 			std::string paramList;  
 
@@ -272,7 +282,10 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 			{
 				qDebug()<<"Model:"<<calcModel.Id<<" Calculate Success, paramList:"<<paramList.c_str(); 
 				if(SingletonDBHelper->insertEquation(calcModel, QString::fromStdString(paramList)))  
+				{
+					SingletonDBHelper->insertFilterData(calcModel, mapListSspgPointInfo);
 					SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 3);
+				}
 			} 
 			else 
 			{
@@ -280,7 +293,7 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 				SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
 			}
 		}
-		else if(listSspgIndex.size() == 3)   //三维曲面
+		else if(listSspgIndex.size() == 3)   //二级抽气
 		{
 			std::list<INPUT_POINT3D> inputData3D = getInputPoint3D(mapListSspgPointInfo);
 			std::list<INPUT_POINT3D> out_point; 
@@ -292,7 +305,44 @@ void CapacityMonitor::startCalcModel(stCalcModel calcModel)
 			{
 				qDebug()<<"Model:"<<calcModel.Id<<" Calculate Success, paramList:"<<paramList.c_str(); 
 				if(SingletonDBHelper->insertEquation(calcModel, QString::fromStdString(paramList)))
+				{ 
+					SingletonDBHelper->insertFilterData(calcModel, mapListSspgPointInfo);
 					SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 3);
+				}
+			} 
+			else 
+			{
+				qWarning()<<"Model:"<<calcModel.Id<<" Calculate Failure";
+				SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 4);
+			}
+		}	
+		else if(listSspgIndex.size() == 4)   //三级抽气
+		{
+			int result = -1;
+			std::string paramList;  
+			for (int i = 1; i <= 3; ++i)
+			{
+				std::list<INPUT_POINT> inputData = getInputPoint(mapListSspgPointInfo, i); 
+				std::list<INPUT_POINT> output; 
+				std::string tmpParamList;  
+				LeastSquaresCurve curve;
+				result = curve.ReturnPoint(inputData, output, tmpParamList);
+				if (result == 0) 
+				{
+					if(i != 1)
+						paramList += ";";
+					paramList += tmpParamList; 
+				}
+			}
+		  
+			if(result == 0)
+			{
+				qDebug()<<"Model:"<<calcModel.Id<<" Calculate Success, paramList:"<<paramList.c_str(); 
+				if(SingletonDBHelper->insertEquation(calcModel, QString::fromStdString(paramList)))  
+				{
+					SingletonDBHelper->insertFilterData(calcModel, mapListSspgPointInfo);
+					SingletonDBHelper->updateCalcModelStatus(calcModel.Id, 3);
+				}
 			} 
 			else 
 			{
@@ -448,14 +498,13 @@ void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 	{
 		QString ddsxIndexCode = QString("%1_M%2_%3").arg(calcModel.FactoryCode).arg(calcModel.SetCode).arg(SingletonConfig->getDDSXIndexCode());
 		float ddsxValue = GetIndexCodeValue(ddsxIndexCode);
-		qDebug()<<fhValue<<ddsxValue;
+
 		if(qAbs(ddsxValue - fhValue) / ddsxValue * 100 < calcModel.AlarmValue)
 		{ 
 			if(!mapCalcModelAlarm.contains(calcModel.Id))
 			{ 
 				QString alarmID = QUuid::createUuid();
 				mapCalcModelAlarm[calcModel.Id] = alarmID;
-
 				SingletonDBHelper->insertTFNLAlarm(alarmID, calcModel, fhValue, ddsxValue, 0, 1);
 			}
 		} 
@@ -464,7 +513,6 @@ void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 			if(mapCalcModelAlarm.contains(calcModel.Id))
 			{
 				QString alarmID = mapCalcModelAlarm.value(calcModel.Id);
-
 				SingletonDBHelper->updateTFNLAlarm(alarmID);
 				mapCalcModelAlarm.remove(calcModel.Id);
 			}
@@ -474,14 +522,13 @@ void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 	{
 		QString ddxxIndexCode = QString("%1_M%2_%3").arg(calcModel.FactoryCode).arg(calcModel.SetCode).arg(SingletonConfig->getDDXXIndexCode());
 		float ddxxValue = GetIndexCodeValue(ddxxIndexCode); 
-		qDebug()<<fhValue<<ddxxValue;
+
 		if(qAbs(ddxxValue - fhValue) / ddxxValue * 100 < calcModel.AlarmValue)
 		{ 
 			if(!mapCalcModelAlarm.contains(calcModel.Id))
 			{ 
 				QString alarmID = QUuid::createUuid();
 				mapCalcModelAlarm[calcModel.Id] = alarmID;
-
 				SingletonDBHelper->insertTFNLAlarm(alarmID, calcModel, fhValue, 0, ddxxValue, 2);
 			}
 		} 
@@ -490,7 +537,6 @@ void CapacityMonitor::startPredictModel(stCalcModel calcModel)
 			if(mapCalcModelAlarm.contains(calcModel.Id))
 			{
 				QString alarmID = mapCalcModelAlarm.value(calcModel.Id);
-
 				SingletonDBHelper->updateTFNLAlarm(alarmID);
 				mapCalcModelAlarm.remove(calcModel.Id);
 			}
@@ -644,7 +690,7 @@ QMap<int, double> CapacityMonitor::calcFhAppearPercent(QMap<int, QList<stPointIn
 }
 
 
-list<INPUT_POINT> CapacityMonitor::getInputPoint(QMap<int, QList<stPointInfo> > mapListPointInfo)
+list<INPUT_POINT> CapacityMonitor::getInputPoint(QMap<int, QList<stPointInfo> > mapListPointInfo, int order)
 {
 	list<INPUT_POINT> listInputPoint;
     QMapIterator<int, QList<stPointInfo> > it(mapListPointInfo);
@@ -659,8 +705,8 @@ list<INPUT_POINT> CapacityMonitor::getInputPoint(QMap<int, QList<stPointInfo> > 
 			stPointInfo pointInfo = listPointInfo.value(i); 
 			//qDebug()<<"desc:"<<pointInfo.desc<<" value:"<<pointInfo.value;
 			if (pointInfo.order == 0)   //负荷 
-				inputPoint.y = (double)pointInfo.value;  
-			else  //供热抽气流量,可能是1级也可能是2级
+				inputPoint.y = (double)pointInfo.value;   
+			else if (pointInfo.order == order)   // //供热抽气流量,可能是1级、2级、3级
 				inputPoint.x = (double)pointInfo.value;  
 		} 
 
@@ -692,7 +738,7 @@ list<INPUT_POINT3D> CapacityMonitor::getInputPoint3D(QMap<int, QList<stPointInfo
 				inputPoint3D.z = pointInfo.value; 
 			else if(pointInfo.order == 1)  //一级供热抽气流量 
 				inputPoint3D.x = pointInfo.value; 
-			else if(pointInfo.order == 2)  //二级供热抽气流量y 
+			else if(pointInfo.order == 2)  //二级供热抽气流量
 				inputPoint3D.y = pointInfo.value; 
 		}  
 	 

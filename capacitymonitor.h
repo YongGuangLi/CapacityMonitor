@@ -53,7 +53,7 @@ public:
 
     QMap<int, double> calcFhAppearPercent(QMap<int, QList<stPointInfo> > mapListPointInfo,QMap<QString, stTfnlCondtion> mapTfnlCondtion, std::vector<double>& list_CNGK_Data);
 
-    list<INPUT_POINT> getInputPoint(QMap<int, QList<stPointInfo> > mapListPointInfo);
+    list<INPUT_POINT> getInputPoint(QMap<int, QList<stPointInfo> > mapListPointInfo, int order);
 	 
     list<INPUT_POINT3D> getInputPoint3D(QMap<int, QList<stPointInfo> > mapListPointInfo);
 

@@ -27,7 +27,7 @@ RCC_DIR     = temp/rcc
 UI_DIR      = temp/ui
 OBJECTS_DIR = temp/obj
 
-include(D:/opensouce/qt-solutions-master/qtservice/src/qtservice.pri)
+include(E:/opensouce/qt-solutions-master/qtservice/src/qtservice.pri)
 
 HEADERS += \
     databasehelper.h \
